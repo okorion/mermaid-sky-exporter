@@ -1,4 +1,4 @@
-# <img src="/favicon.svg" alt="Mermaid Sky Exporter" width="24" height="24" style="vertical-align: middle;" /> Mermaid Sky Exporter
+# <img src="/public/favicon.svg" alt="Mermaid Sky Exporter" width="24" height="24" style="vertical-align: middle;" /> Mermaid Sky Exporter
 
 A **Next.js app for rendering Mermaid diagrams in the browser, customizing styles, and exporting to SVG/PNG/JPG.**
 Supports Monaco and CodeMirror editors with a simple toggle, and enables sharing via URL encoding.

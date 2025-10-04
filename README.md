@@ -1,4 +1,4 @@
-# <img src="/favicon.svg" alt="Mermaid Sky Exporter" width="24" height="24" style="vertical-align: middle;" /> Mermaid Sky Exporter
+# <img src="/public/favicon.svg" alt="Mermaid Sky Exporter" width="24" height="24" style="vertical-align: middle;" /> Mermaid Sky Exporter
 
 Mermaid 다이어그램을 **브라우저에서 바로 미리보고, 다양한 스타일을 선택한 뒤 SVG/PNG/JPG로 내보낼 수 있는 Next.js 프로젝트**입니다.  
 Monaco(Editor)와 CodeMirror(Editor) 간 전환을 지원하며, URL 인코딩 기반 공유 기능을 제공합니다.  
