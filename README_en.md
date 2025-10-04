@@ -4,6 +4,8 @@ A **Next.js app for rendering Mermaid diagrams in the browser, customizing style
 Supports Monaco and CodeMirror editors with a simple toggle, and enables sharing via URL encoding.
 Optimized for easy deployment to Vercel.
 
+<img src="/public/homepage.png" alt="Mermaid Sky Exporter Homepage" />
+
 ---
 
 ## ✨ Features (English)

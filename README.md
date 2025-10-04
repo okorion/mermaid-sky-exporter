@@ -4,6 +4,8 @@ Mermaid 다이어그램을 **브라우저에서 바로 미리보고, 다양한 �
 Monaco(Editor)와 CodeMirror(Editor) 간 전환을 지원하며, URL 인코딩 기반 공유 기능을 제공합니다.  
 Vercel에 손쉽게 배포할 수 있도록 설계되었습니다.
 
+<img src="/public/homepage.png" alt="Mermaid Sky Exporter Homepage" />
+
 ---
 
 ## ✨ 주요 기능 (Korean)
