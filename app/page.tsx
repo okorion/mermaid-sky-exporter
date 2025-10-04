@@ -1,103 +1,120 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import EditorSwitcher from "@/components/EditorSwitcher";
+import ExportButtons from "@/components/ExportButtons";
+import MermaidPreview from "@/components/MermaidPreview";
+import TopBar from "@/components/TopBar";
+import { DEFAULTS, SAMPLE, THEMES, type Theme } from "@/libs/presets";
+import { decodeShareState } from "@/libs/share";
 
-export default function Home() {
+type Mode = "monaco" | "codemirror";
+
+export default function Page() {
+  const [code, setCode] = useState(SAMPLE);
+  const [theme, setTheme] = useState<Theme>(DEFAULTS.theme);
+  const [bg, setBg] = useState(DEFAULTS.bg);
+  const [scale, setScale] = useState(DEFAULTS.scale);
+  const [exportScale, setExportScale] = useState(DEFAULTS.exportScale);
+  const [editorMode, setEditorMode] = useState<Mode>("codemirror");
+  const [svg, setSvg] = useState("");
+
+  useEffect(() => {
+    const s = new URLSearchParams(location.search).get("s");
+    if (s) {
+      const restored = decodeShareState<any>(s);
+      if (restored) {
+        setCode(restored.code ?? SAMPLE);
+        setTheme(restored.theme ?? DEFAULTS.theme);
+        setBg(restored.bg ?? DEFAULTS.bg);
+        setScale(restored.scale ?? DEFAULTS.scale);
+        setExportScale(restored.exportScale ?? DEFAULTS.exportScale);
+        setEditorMode(restored.editorMode ?? "codemirror");
+      }
+    }
+  }, []);
+
+  const shareState = useMemo(
+    () => ({ code, theme, bg, scale, exportScale, editorMode }),
+    [code, theme, bg, scale, exportScale, editorMode]
+  );
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <main style={{ maxWidth: 1200, margin: "0 auto", padding: 20 }}>
+      <TopBar state={shareState} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <EditorSwitcher
+            code={code}
+            onChange={setCode}
+            mode={editorMode}
+            onModeChange={setEditorMode}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        <div>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <label htmlFor="themeSelect">Theme</label>
+            <select
+              id="themeSelect"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as Theme)}
+            >
+              {THEMES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+
+            <label htmlFor="bgPicker">Background</label>
+            <input
+              id="bgPicker"
+              type="color"
+              value={bg}
+              onChange={(e) => setBg(e.target.value)}
+            />
+
+            <label htmlFor="previewScale">Preview Scale</label>
+            <input
+              id="previewScale"
+              type="number"
+              min={0.25}
+              max={4}
+              step={0.25}
+              value={scale}
+              onChange={(e) => setScale(parseFloat(e.target.value))}
+            />
+
+            <label htmlFor="exportScale">Export Scale</label>
+            <input
+              id="exportScale"
+              type="number"
+              min={1}
+              max={6}
+              step={1}
+              value={exportScale}
+              onChange={(e) => setExportScale(parseInt(e.target.value))}
+            />
+          </div>
+          <MermaidPreview
+            code={code}
+            theme={theme}
+            bg={bg}
+            scale={scale} // 수동 스케일은 백업
+            autoFit={true} // ✅ 한 화면에 보이도록 자동 맞춤
+            onSVG={setSvg}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <div style={{ marginTop: 12 }}>
+            <ExportButtons svg={svg} bg={bg} exportScale={exportScale} />
+          </div>
+        </div>
+      </div>
+    </main>
   );
 }
