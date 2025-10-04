@@ -81,7 +81,6 @@ export async function downloadRasterFromSVG(
     const v = await Canvg.from(ctx, normalized, {
       ignoreDimensions: true,
       ignoreClear: true,
-      useCORS: true,
     });
     // 일부 버전에서 resize 제공
     if (typeof (v as any).resize === "function")
