@@ -11,7 +11,7 @@ export default function ExportButtons({
   exportScale: number;
 }) {
   return (
-    <div className="toolbar">
+    <div className="toolbar flex gap-2">
       <button
         type="button"
         className="btn"
