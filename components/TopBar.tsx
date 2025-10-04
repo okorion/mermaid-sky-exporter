@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { encodeShareState } from "@/libs/share";
 
 export default function TopBar({ state }: { state: any }) {
@@ -20,7 +21,24 @@ export default function TopBar({ state }: { state: any }) {
         alignItems: "center",
       }}
     >
-      <div style={{ fontWeight: 800 }}>🫧 Mermaid Sky Exporter</div>
+      <div
+        style={{
+          fontWeight: 800,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+        }}
+      >
+        <Image
+          src="/favicon.svg"
+          alt="Mermaid Sky Exporter"
+          width={20}
+          height={20}
+          priority
+        />
+        Mermaid Sky Exporter
+      </div>
+
       <div className="toolbar">
         <button type="button" className="btn" onClick={onShare}>
           Share Link
