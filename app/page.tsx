@@ -38,81 +38,99 @@ export default function Page() {
   );
 
   return (
-    <main style={{ maxWidth: 1200, margin: "0 auto", padding: 20 }}>
+    <main className="mx-auto max-w-[1400px] p-4">
       <TopBar state={shareState} />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div>
+
+      {/* 레이아웃: 좌측 에디터(고정폭), 우측 프리뷰(가변폭) */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(360px,480px)_1fr]">
+        {/* Editor Panel */}
+        <aside className="h-fit sticky top-4 self-start rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur p-3 lg:p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-700">Editor</span>
+            <div className="text-[11px] text-slate-500">Mode: {editorMode}</div>
+          </div>
+
           <EditorSwitcher
             code={code}
             onChange={setCode}
             mode={editorMode}
             onModeChange={setEditorMode}
           />
-        </div>
-        <div>
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              marginBottom: 8,
-            }}
-          >
-            <label htmlFor="themeSelect">Theme</label>
-            <select
-              id="themeSelect"
-              value={theme}
-              onChange={(e) => setTheme(e.target.value as Theme)}
-            >
-              {THEMES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+        </aside>
 
-            <label htmlFor="bgPicker">Background</label>
-            <input
-              id="bgPicker"
-              type="color"
-              value={bg}
-              onChange={(e) => setBg(e.target.value)}
-            />
+        {/* Preview + Toolbar Panel */}
+        <section className="rounded-2xl border border-slate-200/80 bg-white/60 backdrop-blur shadow-sm flex flex-col">
+          {/* Toolbar — 중앙 정렬 + 높이 통일 */}
+          <div className="flex flex-wrap items-center gap-2 lg:gap-3 border-b border-slate-200/70 p-3 lg:p-4 h-22">
+            {/* Theme + Background (살짝 위로) */}
+            <div className="flex flex-wrap items-center gap-3 self-start mt-1">
+              {/* Theme */}
+              <div className="inline-flex items-center gap-2">
+                <label
+                  htmlFor="themeSelect"
+                  className="text-xs font-medium text-slate-700 leading-none"
+                >
+                  Theme
+                </label>
+                <select
+                  id="themeSelect"
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as Theme)}
+                  className="h-8 rounded-xl border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-slate-300 bg-white"
+                >
+                  {THEMES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <label htmlFor="previewScale">Preview Scale</label>
-            <input
-              id="previewScale"
-              type="number"
-              min={0.25}
-              max={4}
-              step={0.25}
-              value={scale}
-              onChange={(e) => setScale(parseFloat(e.target.value))}
-            />
+              {/* Background */}
+              <div className="inline-flex items-center gap-2">
+                <label
+                  htmlFor="bgPicker"
+                  className="text-xs font-medium text-slate-700 leading-none"
+                >
+                  Background
+                </label>
+                <input
+                  id="bgPicker"
+                  type="color"
+                  value={bg}
+                  onChange={(e) => setBg(e.target.value)}
+                  className="h-8 w-10 rounded-lg border border-slate-200 p-1.5"
+                />
+              </div>
+            </div>
 
-            <label htmlFor="exportScale">Export Scale</label>
-            <input
-              id="exportScale"
-              type="number"
-              min={1}
-              max={6}
-              step={1}
-              value={exportScale}
-              onChange={(e) => setExportScale(parseInt(e.target.value))}
-            />
+            {/* Export Controls (기존 위치 유지, 중앙선 정렬) */}
+            <div className="ml-auto self-center">
+              <ExportButtons
+                svg={svg}
+                bg={bg}
+                exportScale={exportScale}
+                className="bg-white/80"
+              />
+            </div>
           </div>
-          <MermaidPreview
-            code={code}
-            theme={theme}
-            bg={bg}
-            scale={scale} // 수동 스케일은 백업
-            autoFit={true} // ✅ 한 화면에 보이도록 자동 맞춤
-            onSVG={setSvg}
-          />
-          <div style={{ marginTop: 12 }}>
-            <ExportButtons svg={svg} bg={bg} exportScale={exportScale} />
+
+          {/* Preview 영역 */}
+          <div className="relative flex-1 p-3 lg:p-4">
+            <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="p-2">
+                <MermaidPreview
+                  code={code}
+                  theme={theme}
+                  bg={bg}
+                  scale={scale}
+                  autoFit={true}
+                  onSVG={setSvg}
+                />
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     </main>
   );
