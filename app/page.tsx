@@ -6,8 +6,7 @@ import MermaidPreview from "@/components/MermaidPreview";
 import TopBar from "@/components/TopBar";
 import { DEFAULTS, SAMPLE, THEMES, type Theme } from "@/libs/presets";
 import { decodeShareState } from "@/libs/share";
-
-type Mode = "monaco" | "codemirror";
+import type { Mode } from "@/types/types";
 
 export default function Page() {
   const [code, setCode] = useState(SAMPLE);

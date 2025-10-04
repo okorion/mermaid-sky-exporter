@@ -6,12 +6,7 @@ import {
   downloadSVG,
 } from "@/libs/svgExport";
 
-type PresetKey = "3:2" | "4:3" | "16:9";
-const PRESET_TO_ASPECT: Record<PresetKey, number> = {
-  "3:2": 3 / 2, // 1.5
-  "4:3": 4 / 3, // 1.3333…
-  "16:9": 16 / 9, // 1.7777…
-};
+import { ASPECT_MAP, type AspectPreset } from "@/types/types";
 
 export default function ExportButtons({
   svg,
@@ -22,7 +17,7 @@ export default function ExportButtons({
   bg: string;
   exportScale: number;
 }) {
-  const [preset, setPreset] = useState<PresetKey>("3:2");
+  const [preset, setPreset] = useState<AspectPreset>("3:2");
 
   return (
     <div className="toolbar flex flex-wrap items-center gap-2">
@@ -74,7 +69,7 @@ export default function ExportButtons({
           id="aspectPreset"
           className="rounded-lg border border-slate-200 px-2 py-1"
           value={preset}
-          onChange={(e) => setPreset(e.target.value as PresetKey)}
+          onChange={(e) => setPreset(e.target.value as AspectPreset)}
           aria-label="Export aspect ratio preset"
         >
           <option value="3:2">3:2</option>
@@ -88,7 +83,7 @@ export default function ExportButtons({
           className="btn"
           onClick={() =>
             downloadRasterForAspect(svg, `diagram-${preset}.png`, "image/png", {
-              aspect: PRESET_TO_ASPECT[preset],
+              aspect: ASPECT_MAP[preset],
               scale: exportScale,
               background: bg,
             })
@@ -108,7 +103,7 @@ export default function ExportButtons({
               `diagram-${preset}.jpg`,
               "image/jpeg",
               {
-                aspect: PRESET_TO_ASPECT[preset],
+                aspect: ASPECT_MAP[preset],
                 scale: exportScale,
                 background: bg,
               }

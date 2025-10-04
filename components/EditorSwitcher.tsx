@@ -1,8 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-
-type Mode = "monaco" | "codemirror";
+import type { Mode } from "@/types/types";
 
 const Monaco = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const CodeMirror = dynamic(
