@@ -1,14 +1,105 @@
 // libs/svgExport.ts
 import { Canvg } from "canvg";
 
-/**
- * SVG 원본 저장
- */
+/** SVG 원본 저장 */
 export async function downloadSVG(svg: string, filename = "diagram.svg") {
   const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
   trigger(blob, filename);
 }
 
+/** ✅ 프리셋용: 목표 가로/세로 비(Aspect, W/H)를 최소로 보장해 Contain 중앙 배치 */
+export async function downloadRasterForAspect(
+  svg: string,
+  filename: string,
+  type: "image/png" | "image/jpeg",
+  opts: {
+    aspect: number; // 목표 최소 W/H (예: 3:2 → 1.5, 4:3 → 1.3333, 16:9 → 1.7777)
+    scale?: number; // 기본 2
+    background?: string; // 여백/배경색 (프리뷰 bg 전달)
+  }
+) {
+  const scale = opts.scale ?? 2;
+  const bg = opts.background ?? "#ffffff";
+  const targetAspect = Math.max(0.1, opts.aspect);
+
+  // 1) 텍스트 보존 파이프라인
+  const textified = foreignObjectToCenteredText(svg);
+  const normalized = normalizeSvgLight(textified);
+  const src = parseSvgSize(normalized);
+  const baseW = Math.max(1, Math.floor(src.width * scale));
+  const baseH = Math.max(1, Math.floor(src.height * scale));
+
+  await waitFontsForSvg(normalized);
+
+  // 2) 최종 캔버스 크기 결정: 현재 W/H가 목표보다 작으면 가로폭을 늘려 여백 추가
+  const curAspect = baseW / baseH;
+  const dstW =
+    curAspect < targetAspect ? Math.round(baseH * targetAspect) : baseW;
+  const dstH = baseH;
+
+  // 3) 네이티브 렌더 우선
+  try {
+    const blob = new Blob([normalized], {
+      type: "image/svg+xml;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+
+    const { canvas, ctx } = makeCanvas(dstW, dstH);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, dstW, dstH);
+
+    const img = await loadImage(url);
+    const vb = getViewBox(normalized) ?? {
+      x: 0,
+      y: 0,
+      w: src.width,
+      h: src.height,
+    };
+    const { dx, dy, dw, dh } = fitContain(vb.w, vb.h, dstW, dstH);
+    ctx.drawImage(
+      img,
+      Math.round(dx),
+      Math.round(dy),
+      Math.round(dw),
+      Math.round(dh)
+    );
+    queueMicrotask(() => URL.revokeObjectURL(url));
+
+    const out = await canvasToBlob(canvas, type);
+    if (out) trigger(out, filename);
+    return;
+  } catch {
+    // 4) canvg 폴백
+    const { canvas, ctx } = makeCanvas(dstW, dstH);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, dstW, dstH);
+
+    // 오프스크린 → Contain 배치
+    const off = document.createElement("canvas");
+    off.width = baseW;
+    off.height = baseH;
+    const offCtx = off.getContext("2d");
+    if (!offCtx) return;
+
+    const v = await Canvg.from(offCtx, normalized, {
+      ignoreDimensions: true,
+      ignoreClear: true,
+    });
+    await v.render();
+
+    const { dx, dy, dw, dh } = fitContain(off.width, off.height, dstW, dstH);
+    ctx.drawImage(
+      off,
+      Math.round(dx),
+      Math.round(dy),
+      Math.round(dw),
+      Math.round(dh)
+    );
+
+    const out = await canvasToBlob(canvas, type);
+    if (out) trigger(out, filename);
+  }
+}
 /**
  * SVG → PNG/JPG
  * 1) foreignObject → <text> 치환(계산된 스타일 인라인, 도형 정중앙 배치)
