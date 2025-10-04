@@ -22,8 +22,11 @@ export async function downloadRasterForAspect(
   const bg = opts.background ?? "#ffffff";
   const targetAspect = Math.max(0.1, opts.aspect);
 
-  // 1) 텍스트 보존 파이프라인
-  const textified = foreignObjectToCenteredText(svg);
+  // 1) 텍스트 보존 + 라벨 배경 선합성(pre-compose)
+  const textified = foreignObjectToCenteredText(svg, {
+    canvasBg: bg,
+    precompose: true,
+  });
   const normalized = normalizeSvgLight(textified);
   const src = parseSvgSize(normalized);
   const baseW = Math.max(1, Math.floor(src.width * scale));
@@ -100,9 +103,10 @@ export async function downloadRasterForAspect(
     if (out) trigger(out, filename);
   }
 }
+
 /**
  * SVG → PNG/JPG
- * 1) foreignObject → <text> 치환(계산된 스타일 인라인, 도형 정중앙 배치)
+ * 1) foreignObject → <text> 치환(+ 라벨 배경을 캔버스 배경과 선합성)
  * 2) viewBox/size 보정
  * 3) 폰트 로딩 대기(document.fonts)
  * 4) 네이티브 렌더(SVG→Image→drawImage), 실패 시 canvg 폴백
@@ -114,8 +118,11 @@ export async function downloadRasterFromSVG(
   scale = 2,
   bg = "#ffffff"
 ) {
-  // A) foreignObject → <text> (정중앙 배치 + 계산된 스타일 인라인)
-  const textified = foreignObjectToCenteredText(svg);
+  // A) foreignObject → <text> (정중앙 배치 + 계산된 스타일 인라인) + 선합성
+  const textified = foreignObjectToCenteredText(svg, {
+    canvasBg: bg,
+    precompose: true,
+  });
 
   // B) viewBox/size 보정
   const normalized = normalizeSvgLight(textified);
@@ -199,7 +206,14 @@ function makeCanvas(w: number, h: number) {
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("2D canvas context is not supported in this environment.");
+  }
+  ctx.imageSmoothingEnabled = true;
+  // 타입 정의에 없어서 any 캐스팅
+  (ctx as any).imageSmoothingQuality = "high";
   return { canvas, ctx };
 }
 
@@ -217,7 +231,7 @@ function canvasToBlob(
   type: "image/png" | "image/jpeg"
 ): Promise<Blob | null> {
   return new Promise((resolve) =>
-    canvas.toBlob(resolve, type, type === "image/jpeg" ? 0.92 : undefined)
+    canvas.toBlob(resolve, type, type === "image/jpeg" ? 1.0 : undefined)
   );
 }
 
@@ -335,12 +349,15 @@ function collectFontFamilies(svg: string): Set<string> {
 
 /* ──────────────────────────
  * 핵심: foreignObject → <text> (정중앙 배치 + 계산된 스타일 인라인)
+ *  - 배경은 캔버스 배경과 미리 합성(pre-compose)하여 불투명 색으로 치환
  *  - 가로/세로 중앙: text-anchor="middle", dominant-baseline="middle"
  *  - 멀티라인: tspan으로 중앙 기준 균등 배치
  *  - 위치는 부모 transform 유지(원래 도형 자리)
  * ────────────────────────── */
-
-function foreignObjectToCenteredText(svgString: string): string {
+function foreignObjectToCenteredText(
+  svgString: string,
+  opts?: { canvasBg?: string; precompose?: boolean }
+): string {
   const parser = new DOMParser();
   const srcDoc = parser.parseFromString(svgString, "image/svg+xml");
   const srcSvg = srcDoc.documentElement;
@@ -356,6 +373,9 @@ function foreignObjectToCenteredText(svgString: string): string {
 
   const foList = Array.from(srcSvg.querySelectorAll("foreignObject"));
   const foListShadow = Array.from(shadowSvg.querySelectorAll("foreignObject"));
+
+  const canvasBgHex = cssColorToHex(opts?.canvasBg ?? "#ffffff");
+  const doPrecompose = !!opts?.precompose;
 
   foList.forEach((fo, i) => {
     const foShadow = foListShadow[i];
@@ -376,6 +396,21 @@ function foreignObjectToCenteredText(svgString: string): string {
       "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
     const fontSize = cs?.fontSize || "14px";
     const fontWeight = cs?.fontWeight || "400";
+
+    // 배경/패딩/라운드/테두리
+    const bgColorCss = cs?.backgroundColor || "rgba(0,0,0,0)";
+    const { hex: bgHex, a: bgAlpha } = cssColorToHexA(bgColorCss);
+
+    const padT = pxNum(cs?.paddingTop, 0);
+    const padR = pxNum(cs?.paddingRight, 0);
+    const padB = pxNum(cs?.paddingBottom, 0);
+    const padL = pxNum(cs?.paddingLeft, 0);
+
+    const radius = pxNum(cs?.borderTopLeftRadius, 0);
+
+    const borderW = pxNum(cs?.borderTopWidth, 0);
+    const borderColorCss = cs?.borderTopColor || "rgba(0,0,0,0)";
+    const { hex: borderHex, a: borderAlpha } = cssColorToHexA(borderColorCss);
 
     const width = Number(fo.getAttribute("width") || 0);
     const height = Number(fo.getAttribute("height") || 0);
@@ -407,6 +442,7 @@ function foreignObjectToCenteredText(svgString: string): string {
     textNode.setAttribute("font-family", fontFamily);
     textNode.setAttribute("font-size", fontSize);
     textNode.setAttribute("font-weight", fontWeight);
+    textNode.setAttribute("opacity", "1");
 
     // 멀티라인 처리: 중앙 기준 위/아래 균등 분포
     const lines = textContent.split(/\r?\n/).map((s) => s.trim());
@@ -425,6 +461,68 @@ function foreignObjectToCenteredText(svgString: string): string {
         tspan.textContent = line;
         textNode.appendChild(tspan);
       });
+    }
+
+    // 텍스트 블록 측정 후 배경 rect 삽입
+    {
+      const fontForMeasure = `${fontWeight} ${fontSize} ${fontFamily}`;
+      const { width: tw, height: th } = measureTextBlock(
+        lines.length ? lines : [textNode.textContent || ""],
+        fontForMeasure,
+        lineHeight
+      );
+
+      const bw = tw + padL + padR;
+      const bh = th + padT + padB;
+
+      if (bgAlpha > 0 && bw > 0 && bh > 0) {
+        const rect = srcDoc.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "rect"
+        );
+        rect.setAttribute("x", String(cx - bw / 2));
+        rect.setAttribute("y", String(cy - bh / 2));
+        rect.setAttribute("width", String(bw));
+        rect.setAttribute("height", String(bh));
+        if (radius > 0) {
+          rect.setAttribute("rx", String(radius));
+          rect.setAttribute("ry", String(radius));
+        }
+
+        // ▼ 최소 가시성 하한 + 선합성
+        const minAlpha = 1;
+        const effAlpha = Math.max(bgAlpha, minAlpha);
+
+        let finalFill = bgHex;
+        let finalFillOpacity = 1;
+
+        if (doPrecompose && effAlpha < 1) {
+          finalFill = blendOver(bgHex, canvasBgHex, effAlpha); // 불투명 색으로 치환
+          finalFillOpacity = 1;
+        } else {
+          finalFillOpacity = effAlpha;
+        }
+
+        rect.setAttribute("fill", finalFill);
+        rect.setAttribute("opacity", "1");
+        if (finalFillOpacity < 1)
+          rect.setAttribute("fill-opacity", String(finalFillOpacity));
+
+        // 대비 강화용 테두리(아주 옅게)
+        if (borderW > 0 && borderAlpha > 0) {
+          rect.setAttribute("stroke", borderHex);
+          if (borderAlpha < 1)
+            rect.setAttribute("stroke-opacity", String(borderAlpha));
+          rect.setAttribute("stroke-width", String(borderW));
+        } else {
+          rect.setAttribute("stroke", "#000000");
+          rect.setAttribute("stroke-opacity", "0.15");
+          rect.setAttribute("stroke-width", "1");
+        }
+
+        // z-order: 배경 → 텍스트
+        g.appendChild(rect);
+      }
     }
 
     g.appendChild(textNode);
@@ -451,4 +549,80 @@ function cssColorToHex(input: string): string {
   const cs = window.getComputedStyle(tmp).color;
   document.body.removeChild(tmp);
   return cssColorToHex(cs || "#000000");
+}
+
+/** px 문자열 → number (기본값 fallback) */
+function pxNum(v?: string | null, fallback = 0) {
+  if (!v) return fallback;
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** CSS color → { hex, a }  (rgba 처리: fill + fill-opacity 분리용) */
+function cssColorToHexA(input: string): { hex: string; a: number } {
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(input)) return { hex: input, a: 1 };
+
+  const tmp = document.createElement("div");
+  tmp.style.color = input;
+  document.body.appendChild(tmp);
+  const color = getComputedStyle(tmp).color; // rgb(a)
+  document.body.removeChild(tmp);
+
+  const m = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/i);
+  if (!m) return { hex: "#000000", a: 1 };
+  const r = Number(m[1]),
+    g = Number(m[2]),
+    b = Number(m[3]);
+  const a = m[4] !== undefined ? Math.max(0, Math.min(1, Number(m[4]))) : 1;
+  const hex = `#${r.toString(16).padStart(2, "0")}${g
+    .toString(16)
+    .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  return { hex, a };
+}
+
+/** 오프스크린 Canvas로 멀티라인 텍스트 블록 측정 */
+function measureTextBlock(lines: string[], font: string, lineHeight: number) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("2D canvas context is not supported in this environment.");
+  }
+  ctx.font = font;
+  let maxW = 0;
+  for (const line of lines) {
+    const w = ctx.measureText(line).width;
+    if (w > maxW) maxW = w;
+  }
+  const height = Math.max(lineHeight, lines.length * lineHeight);
+  return { width: Math.ceil(maxW), height: Math.ceil(height) };
+}
+
+/* ──────────────── 색상 합성 헬퍼 ──────────────── */
+function hexToRgb(hex: string) {
+  const s = hex.replace("#", "");
+  const arr =
+    s.length === 3
+      ? s.split("").map((c) => parseInt(c + c, 16))
+      : [
+          parseInt(s.slice(0, 2), 16),
+          parseInt(s.slice(2, 4), 16),
+          parseInt(s.slice(4, 6), 16),
+        ];
+  return { r: arr[0], g: arr[1], b: arr[2] };
+}
+function rgbToHex(r: number, g: number, b: number) {
+  const h = (x: number) =>
+    Math.max(0, Math.min(255, Math.round(x)))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+/** fg(알파) 를 bg 위에 합성한 불투명 색 */
+function blendOver(fgHex: string, bgHex: string, a: number) {
+  const fg = hexToRgb(fgHex),
+    bg = hexToRgb(bgHex);
+  const r = fg.r * a + bg.r * (1 - a);
+  const g = fg.g * a + bg.g * (1 - a);
+  const b = fg.b * a + bg.b * (1 - a);
+  return rgbToHex(r, g, b);
 }
