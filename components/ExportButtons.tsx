@@ -56,7 +56,7 @@ export default function ExportButtons({
   const isAspectDisabled = format === "svg";
 
   return (
-    <div
+    <section
       className={["min-w-0", className].join(" ")}
       aria-label="Export toolbar"
     >
@@ -136,6 +136,6 @@ export default function ExportButtons({
       >
         {hint}
       </p>
-    </div>
+    </section>
   );
 }

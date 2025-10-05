@@ -42,7 +42,7 @@ export default function Page() {
       <TopBar state={shareState} />
 
       {/* 레이아웃: 좌측 에디터(고정폭), 우측 프리뷰(가변폭) */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(360px,480px)_1fr]">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(360px,480px)_1fr]">
         {/* Editor Panel */}
         <aside className="h-fit sticky top-4 self-start rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur p-3 lg:p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
