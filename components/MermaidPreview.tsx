@@ -12,6 +12,7 @@ type Props = {
 };
 
 const FIXED_PREVIEW_HEIGHT_PX = 500;
+const EPS = 0.005;
 
 // 노드/엣지 카운트
 function countNodes(code: string): number {
@@ -19,7 +20,6 @@ function countNodes(code: string): number {
   return m ? m.length : 0;
 }
 function countEdges(code: string): number {
-  // 기본적인 Mermaid 화살표/선 패턴들
   const m = code.match(/-->|-\.->|===|--/g);
   return m ? m.length : 0;
 }
@@ -34,10 +34,23 @@ export default function MermaidPreview({
 }: Props) {
   const [rawSvg, setRawSvg] = useState("");
   const [fitScale, setFitScale] = useState<number>(scale);
-
-  const mermaidRef = useRef<any>(null);
+  const fitScaleRef = useRef<number>(scale);
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
+  const mermaidRef = useRef<any>(null);
+
+  // ✅ setFitScaleSafe를 useCallback으로 안정화
+  const setFitScaleSafe = useCallback((v: number) => {
+    fitScaleRef.current = v;
+    setFitScale(v);
+  }, []); // setState 세터는 안정적이라 deps 비워도 됨
+
+  // autoFit 끄면 외부 scale에 즉시 동기화
+  useEffect(() => {
+    if (!autoFit && Math.abs(fitScaleRef.current - scale) > EPS) {
+      setFitScaleSafe(scale);
+    }
+  }, [autoFit, scale, setFitScaleSafe]); // ✅ 의존성 추가
 
   // 1) Mermaid 렌더
   useEffect(() => {
@@ -77,23 +90,30 @@ export default function MermaidPreview({
     };
   }, [code, theme, onSVG]);
 
-  // 2) SVG 주입 (dangerouslySetInnerHTML 미사용)
+  // 2) SVG 주입
   useEffect(() => {
     if (svgContainerRef.current) {
       svgContainerRef.current.innerHTML = rawSvg;
     }
   }, [rawSvg]);
 
-  // 3) 오토핏 계산 (보정 로직 포함)
+  // 3) 오토핏 계산
   const computeAndSetFit = useCallback(() => {
     if (!autoFit || !rawSvg || !wrapRef.current) {
-      setFitScale(scale);
+      if (Math.abs(fitScaleRef.current - scale) > EPS) setFitScaleSafe(scale);
       return;
     }
     const wrap = wrapRef.current;
-    const wrapW = wrap.clientWidth;
-    const wrapH = wrap.clientHeight;
-    if (!wrapW || !wrapH) return;
+
+    // 패딩 제거한 실사용 영역
+    const cs = getComputedStyle(wrap);
+    const padX =
+      parseFloat(cs.paddingLeft || "0") + parseFloat(cs.paddingRight || "0");
+    const padY =
+      parseFloat(cs.paddingTop || "0") + parseFloat(cs.paddingBottom || "0");
+    const usableW = Math.max(0, wrap.clientWidth - padX);
+    const usableH = Math.max(0, wrap.clientHeight - padY);
+    if (!usableW || !usableH) return;
 
     const vb = rawSvg.match(/viewBox\s*=\s*"([\d.\s-]+)"/i);
     let svgW = 0,
@@ -106,56 +126,54 @@ export default function MermaidPreview({
       }
     }
     if (!svgW || !svgH) {
-      setFitScale(scale);
+      if (Math.abs(fitScaleRef.current - scale) > EPS) setFitScaleSafe(scale);
       return;
     }
 
     const nodes = countNodes(code);
     const edges = countEdges(code);
 
-    // 기본 비율(가장 짧은 변 기준)
-    const base = Math.min(wrapW / svgW, wrapH / svgH);
+    const SAFE_MARGIN = 1;
+    const base = Math.min(
+      (usableW - SAFE_MARGIN) / svgW,
+      (usableH - SAFE_MARGIN) / svgH
+    );
 
-    // 그래프 규모에 따른 가중치와 한계값
-    const MIN_FIT_SCALE = 0.5; // 너무 작게 보이는 것 방지
-    const MAX_FIT_SCALE = 1.2; // 과도 확대 방지(작은 그래프)
+    const MIN_FIT_SCALE = 0.5;
+    const MAX_FIT_SCALE = 1.2;
 
     let s: number;
+    if (nodes <= 4 && edges <= 4) s = Math.min(base, 1) * 0.95;
+    else if (nodes <= 12) s = base * 0.95;
+    else if (nodes <= 60) s = base * 0.9;
+    else s = base * 0.85;
 
-    if (nodes <= 4 && edges <= 4) {
-      // 아주 작은 그래프: 100% 이상 키우지 않고 약간의 여백
-      s = Math.min(base, 1) * 0.95;
-    } else if (nodes <= 12) {
-      // 작은~중간: 약간의 여백
-      s = base * 0.95;
-    } else if (nodes <= 60) {
-      // 중간~큰: 더 넉넉한 여백
-      s = base * 0.9;
-    } else {
-      // 매우 큰 그래프: 여백을 더 주지 않으면 라벨이 붙는 경우가 많음
-      s = base * 0.85;
-    }
-
-    // 최종 클램프
     const clamped = Math.min(
       MAX_FIT_SCALE,
       Math.max(MIN_FIT_SCALE, Number(s.toFixed(3)))
     );
-    setFitScale(clamped);
-  }, [autoFit, rawSvg, scale, code]);
 
-  // 4) 초기/리사이즈 시 오토핏
+    if (Math.abs(clamped - fitScaleRef.current) > EPS) {
+      setFitScaleSafe(clamped);
+    }
+  }, [autoFit, rawSvg, scale, code, setFitScaleSafe]); // ✅ 의존성 추가
+
+  // 4) 초기/리사이즈 시 오토핏 (raf 디바운스)
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
 
-    const ro = new ResizeObserver(computeAndSetFit);
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(computeAndSetFit);
+    });
     ro.observe(el);
-
     computeAndSetFit();
 
     return () => {
-      ro.unobserve(el);
+      cancelAnimationFrame(raf);
+      ro.disconnect();
     };
   }, [computeAndSetFit]);
 
@@ -164,13 +182,10 @@ export default function MermaidPreview({
     [autoFit, fitScale, scale]
   );
 
-  // ⛶ 버튼: 현재 컨테이너 기준 “전체 보기”로 재정렬
   const handleFitToView = () => {
     computeAndSetFit();
     const el = wrapRef.current;
-    if (el) {
-      el.scrollTo({ top: 0, left: 0, behavior: "smooth" });
-    }
+    if (el) el.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
   return (
@@ -186,7 +201,7 @@ export default function MermaidPreview({
       onWheelCapture={(e) => e.stopPropagation()}
       aria-label="Mermaid diagram viewport"
     >
-      {/* ⛶ 버튼: 프리뷰 내부 고정(세로/가로 스크롤에도 고정) */}
+      {/* ⛶ 버튼 */}
       <div className="sticky top-2 left-0 right-0 z-30">
         <div className="flex justify-end pr-2 pointer-events-none">
           <button
