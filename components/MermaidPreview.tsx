@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Theme } from "@/libs/presets";
+import type { Mermaid as MermaidRuntime, MermaidConfig } from "mermaid";
 
 type Props = {
   code: string;
@@ -11,9 +12,6 @@ type Props = {
   onSVG: (svg: string) => void;
   autoFit?: boolean;
 };
-
-type MermaidRuntime = typeof import("mermaid").default;
-type MermaidConfig = Parameters<MermaidRuntime["initialize"]>[0];
 
 const FIXED_PREVIEW_HEIGHT_PX = 500;
 const EPS = 0.005;
