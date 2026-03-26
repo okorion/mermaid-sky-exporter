@@ -12,15 +12,8 @@ type Props = {
   autoFit?: boolean;
 };
 
-type MermaidRuntime = {
-  initialize: (options: {
-    startOnLoad: boolean;
-    theme: string;
-    securityLevel: string;
-    fontFamily: string;
-  }) => void;
-  render: (id: string, code: string) => Promise<{ svg: string }>;
-};
+type MermaidRuntime = typeof import("mermaid").default;
+type MermaidConfig = Parameters<MermaidRuntime["initialize"]>[0];
 
 const FIXED_PREVIEW_HEIGHT_PX = 500;
 const EPS = 0.005;
@@ -85,6 +78,8 @@ export default function MermaidPreview({
   const mermaidRef = useRef<MermaidRuntime | null>(null);
   const renderSeqRef = useRef(0);
   const fitRafRef = useRef<number | null>(null);
+  const resolvedTheme: MermaidConfig["theme"] =
+    theme === "custom" ? "base" : theme;
 
   const setFitScaleSafe = useCallback((nextScale: number) => {
     if (Math.abs(fitScaleRef.current - nextScale) <= EPS) {
@@ -117,7 +112,7 @@ export default function MermaidPreview({
         }
         mermaid.initialize({
           startOnLoad: false,
-          theme: theme === "custom" ? "base" : theme,
+          theme: resolvedTheme,
           securityLevel: "strict",
           fontFamily: "Inter, Pretendard, system-ui, sans-serif",
         });
@@ -138,7 +133,7 @@ export default function MermaidPreview({
     return () => {
       cancelled = true;
     };
-  }, [code, theme, onSVG]);
+  }, [code, onSVG, resolvedTheme]);
 
   useEffect(() => {
     const container = svgContainerRef.current;
