@@ -1,5 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import type { MermaidConfig, Mermaid as MermaidRuntime } from "mermaid";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Theme } from "@/libs/presets";
 
 type Props = {
@@ -13,44 +15,89 @@ type Props = {
 
 const FIXED_PREVIEW_HEIGHT_PX = 500;
 const EPS = 0.005;
+const FIT_PADDING_PX = 16;
+const MIN_FIT_SCALE = 0.4;
+const MAX_FIT_SCALE = 1.2;
 
 function buildStatusSvg({
   fill,
-  message,
-  textFill,
+  height,
+  label,
+  subtitle,
+  subtitleFill,
+  title,
+  titleFill,
 }: {
   fill: string;
-  message: string;
-  textFill: string;
+  height: number;
+  label: string;
+  subtitle?: string;
+  subtitleFill?: string;
+  title: string;
+  titleFill: string;
 }) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="60" viewBox="0 0 420 60" role="img" aria-label="${message}">
-    <rect width="420" height="60" rx="12" fill="${fill}"/>
-    <text x="16" y="36" font-size="14" font-family="Inter, Pretendard, system-ui, sans-serif" fill="${textFill}">
-      ${message}
-    </text>
-  </svg>`;
+  const subtitleLine = subtitle
+    ? `<text x="18" y="58" font-size="13" fill="${subtitleFill ?? titleFill}">${subtitle}</text>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="${height}" viewBox="0 0 420 ${height}" role="img" aria-label="${label}">
+  <rect width="100%" height="100%" rx="12" fill="${fill}" />
+  <text x="18" y="34" font-size="16" font-weight="700" fill="${titleFill}">${title}</text>
+  ${subtitleLine}
+</svg>`;
 }
 
 const EMPTY_PREVIEW_SVG = buildStatusSvg({
   fill: "#f8fafc",
-  message: "Enter Mermaid code to preview.",
-  textFill: "#475569",
+  height: 60,
+  label: "Empty Mermaid diagram",
+  title: "Enter Mermaid code to preview.",
+  titleFill: "#475569",
 });
 
 const ERROR_PREVIEW_SVG = buildStatusSvg({
   fill: "#fee2e2",
-  message: "Mermaid Parse Error",
-  textFill: "#b91c1c",
+  height: 88,
+  label: "Mermaid parse error",
+  subtitle: "Check the diagram syntax and try again.",
+  subtitleFill: "#7f1d1d",
+  title: "Mermaid Parse Error",
+  titleFill: "#991b1b",
 });
 
-// 노드/엣지 카운트
-function countNodes(code: string): number {
-  const m = code.match(/(\[.*?\]|\{.*?\}|\(\(.*?\)\))/g);
-  return m ? m.length : 0;
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
-function countEdges(code: string): number {
-  const m = code.match(/-->|-\.->|===|--/g);
-  return m ? m.length : 0;
+
+function parseSvgLength(value: string | null) {
+  if (!value) return 0;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseSvgIntrinsicSize(svgString: string) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgString, "image/svg+xml");
+  const svg = doc.documentElement;
+
+  const viewBox = svg.getAttribute("viewBox");
+  if (viewBox) {
+    const parts = viewBox
+      .trim()
+      .split(/[\s,]+/)
+      .map((part) => Number.parseFloat(part));
+    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+      return { width: parts[2], height: parts[3] };
+    }
+  }
+
+  const width = parseSvgLength(svg.getAttribute("width"));
+  const height = parseSvgLength(svg.getAttribute("height"));
+  if (width > 0 && height > 0) {
+    return { width, height };
+  }
+
+  return null;
 }
 
 export default function MermaidPreview({
@@ -66,158 +113,159 @@ export default function MermaidPreview({
   const fitScaleRef = useRef<number>(scale);
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgContainerRef = useRef<HTMLDivElement>(null);
-  const mermaidRef = useRef<any>(null);
+  const mermaidRef = useRef<MermaidRuntime | null>(null);
+  const renderSeqRef = useRef(0);
+  const fitRafRef = useRef<number | null>(null);
+  const resolvedTheme: MermaidConfig["theme"] =
+    theme === "custom" ? "base" : theme;
 
-  // ✅ setFitScaleSafe를 useCallback으로 안정화
-  const setFitScaleSafe = useCallback((v: number) => {
-    fitScaleRef.current = v;
-    setFitScale(v);
-  }, []); // setState 세터는 안정적이라 deps 비워도 됨
+  const setFitScaleSafe = useCallback((nextScale: number) => {
+    if (Math.abs(fitScaleRef.current - nextScale) <= EPS) {
+      return;
+    }
+    fitScaleRef.current = nextScale;
+    setFitScale(nextScale);
+  }, []);
 
-  // autoFit 끄면 외부 scale에 즉시 동기화
   useEffect(() => {
-    if (!autoFit && Math.abs(fitScaleRef.current - scale) > EPS) {
+    if (!autoFit) {
       setFitScaleSafe(scale);
     }
-  }, [autoFit, scale, setFitScaleSafe]); // ✅ 의존성 추가
+  }, [autoFit, scale, setFitScaleSafe]);
 
-  // 1) Mermaid 렌더
   useEffect(() => {
     let cancelled = false;
+    const renderId = ++renderSeqRef.current;
+    const trimmedCode = code.trim();
+
     onSVG("");
+
+    if (!trimmedCode) {
+      setRawSvg(EMPTY_PREVIEW_SVG);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     (async () => {
-      const trimmedCode = code.trim();
-      if (!trimmedCode) {
-        if (!cancelled) {
-          setRawSvg(EMPTY_PREVIEW_SVG);
-        }
-        return;
-      }
-
-      if (!mermaidRef.current) {
-        const mod = await import("mermaid");
-        mermaidRef.current = mod.default ?? mod;
-      }
-      const mermaid = mermaidRef.current;
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: theme === "custom" ? "base" : theme,
-        securityLevel: "strict",
-        fontFamily: "Inter, Pretendard, system-ui, sans-serif",
-      });
-
       try {
-        const { svg } = await mermaid.render(`m-${Date.now()}`, trimmedCode);
-        if (!cancelled) {
+        if (!mermaidRef.current) {
+          const mod = await import("mermaid");
+          mermaidRef.current = mod.default ?? mod;
+        }
+
+        const mermaid = mermaidRef.current;
+        if (!mermaid) {
+          throw new Error("Mermaid runtime was not initialized.");
+        }
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: resolvedTheme,
+          securityLevel: "strict",
+          fontFamily: "Inter, Pretendard, system-ui, sans-serif",
+        });
+
+        const { svg } = await mermaid.render(`m-${renderId}`, trimmedCode);
+        if (!cancelled && renderSeqRef.current === renderId) {
           const exportableSvg = svg.trim();
           setRawSvg(exportableSvg);
           onSVG(exportableSvg);
         }
       } catch {
-        if (!cancelled) {
+        if (!cancelled && renderSeqRef.current === renderId) {
           setRawSvg(ERROR_PREVIEW_SVG);
         }
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [code, theme, onSVG]);
+  }, [code, onSVG, resolvedTheme]);
 
-  // 2) SVG 주입
   useEffect(() => {
-    if (svgContainerRef.current) {
-      svgContainerRef.current.innerHTML = rawSvg;
+    const container = svgContainerRef.current;
+    if (!container) {
+      return;
     }
+    container.innerHTML = rawSvg;
   }, [rawSvg]);
 
-  // 3) 오토핏 계산
-  const computeAndSetFit = useCallback(() => {
-    if (!autoFit || !rawSvg || !wrapRef.current) {
-      if (Math.abs(fitScaleRef.current - scale) > EPS) setFitScaleSafe(scale);
-      return;
+  const scheduleFit = useCallback(() => {
+    if (fitRafRef.current !== null) {
+      cancelAnimationFrame(fitRafRef.current);
     }
-    const wrap = wrapRef.current;
 
-    // 패딩 제거한 실사용 영역
-    const cs = getComputedStyle(wrap);
-    const padX =
-      parseFloat(cs.paddingLeft || "0") + parseFloat(cs.paddingRight || "0");
-    const padY =
-      parseFloat(cs.paddingTop || "0") + parseFloat(cs.paddingBottom || "0");
-    const usableW = Math.max(0, wrap.clientWidth - padX);
-    const usableH = Math.max(0, wrap.clientHeight - padY);
-    if (!usableW || !usableH) return;
+    fitRafRef.current = requestAnimationFrame(() => {
+      fitRafRef.current = null;
 
-    const vb = rawSvg.match(/viewBox\s*=\s*"([\d.\s-]+)"/i);
-    let svgW = 0,
-      svgH = 0;
-    if (vb?.[1]) {
-      const p = vb[1].trim().split(/\s+/).map(Number);
-      if (p.length === 4) {
-        svgW = p[2];
-        svgH = p[3];
+      const wrap = wrapRef.current;
+      if (!wrap || !rawSvg) {
+        setFitScaleSafe(scale);
+        return;
       }
-    }
-    if (!svgW || !svgH) {
-      if (Math.abs(fitScaleRef.current - scale) > EPS) setFitScaleSafe(scale);
-      return;
-    }
 
-    const nodes = countNodes(code);
-    const edges = countEdges(code);
+      const size = parseSvgIntrinsicSize(rawSvg);
+      if (!autoFit || !size) {
+        setFitScaleSafe(scale);
+        return;
+      }
 
-    const SAFE_MARGIN = 1;
-    const base = Math.min(
-      (usableW - SAFE_MARGIN) / svgW,
-      (usableH - SAFE_MARGIN) / svgH,
-    );
+      const cs = getComputedStyle(wrap);
+      const padX =
+        Number.parseFloat(cs.paddingLeft || "0") +
+        Number.parseFloat(cs.paddingRight || "0");
+      const padY =
+        Number.parseFloat(cs.paddingTop || "0") +
+        Number.parseFloat(cs.paddingBottom || "0");
 
-    const MIN_FIT_SCALE = 0.5;
-    const MAX_FIT_SCALE = 1.2;
+      const usableW = Math.max(0, wrap.clientWidth - padX - FIT_PADDING_PX);
+      const usableH = Math.max(0, wrap.clientHeight - padY - FIT_PADDING_PX);
+      if (!usableW || !usableH) {
+        return;
+      }
 
-    let s: number;
-    if (nodes <= 4 && edges <= 4) s = Math.min(base, 1) * 0.95;
-    else if (nodes <= 12) s = base * 0.95;
-    else if (nodes <= 60) s = base * 0.9;
-    else s = base * 0.85;
-
-    const clamped = Math.min(
-      MAX_FIT_SCALE,
-      Math.max(MIN_FIT_SCALE, Number(s.toFixed(3))),
-    );
-
-    if (Math.abs(clamped - fitScaleRef.current) > EPS) {
-      setFitScaleSafe(clamped);
-    }
-  }, [autoFit, rawSvg, scale, code, setFitScaleSafe]); // ✅ 의존성 추가
-
-  // 4) 초기/리사이즈 시 오토핏 (raf 디바운스)
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return;
-
-    let raf = 0;
-    const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(computeAndSetFit);
+      const baseScale = Math.min(usableW / size.width, usableH / size.height);
+      const nextScale = clamp(
+        Number((baseScale * 0.96).toFixed(3)),
+        MIN_FIT_SCALE,
+        MAX_FIT_SCALE,
+      );
+      setFitScaleSafe(nextScale);
     });
-    ro.observe(el);
-    computeAndSetFit();
+  }, [autoFit, rawSvg, scale, setFitScaleSafe]);
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+
+    let cancelled = false;
+    const ro = new ResizeObserver(() => {
+      if (!cancelled) {
+        scheduleFit();
+      }
+    });
+
+    ro.observe(wrap);
+    const svg = svgContainerRef.current?.querySelector("svg");
+    if (svg) {
+      ro.observe(svg);
+    }
+
+    scheduleFit();
 
     return () => {
-      cancelAnimationFrame(raf);
+      cancelled = true;
+      if (fitRafRef.current !== null) {
+        cancelAnimationFrame(fitRafRef.current);
+        fitRafRef.current = null;
+      }
       ro.disconnect();
     };
-  }, [computeAndSetFit]);
-
-  const appliedScale = useMemo(
-    () => (autoFit ? fitScale : scale),
-    [autoFit, fitScale, scale],
-  );
+  }, [scheduleFit]);
 
   const handleFitToView = () => {
-    computeAndSetFit();
+    scheduleFit();
     const el = wrapRef.current;
     if (el) el.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
@@ -235,26 +283,24 @@ export default function MermaidPreview({
       onWheelCapture={(e) => e.stopPropagation()}
       aria-label="Mermaid diagram viewport"
     >
-      {/* ⛶ 버튼 */}
       <div className="sticky top-2 left-0 right-0 z-30">
         <div className="flex justify-end pr-2 pointer-events-none">
           <button
             type="button"
             onClick={handleFitToView}
             className="pointer-events-auto rounded-md bg-white/80 border border-slate-200 px-2 py-1 text-sm shadow-sm hover:bg-white active:scale-[0.97] transition"
-            title="전체 보기"
-            aria-label="전체 보기"
+            title="Fit to view"
+            aria-label="Fit to view"
           >
-            ⛶
+            Fit
           </button>
         </div>
       </div>
 
-      {/* Preview 콘텐츠 */}
       <div
         className="flex items-start justify-center"
         style={{
-          transform: `scale(${appliedScale})`,
+          transform: `scale(${autoFit ? fitScale : scale})`,
           transformOrigin: "top left",
           padding: 8,
         }}
