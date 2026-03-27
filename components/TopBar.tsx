@@ -42,8 +42,12 @@ export default function TopBar({ state }: TopBarProps) {
 
   const copyViaClipboardApi = async (value: string) => {
     if (!navigator.clipboard?.writeText) return false;
-    await navigator.clipboard.writeText(value);
-    return true;
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   const copyViaTextarea = (value: string) => {
