@@ -13,6 +13,7 @@ import {
 } from "@/types/types";
 
 export default function ExportButtons({
+  code,
   aspect,
   bg,
   className = "",
@@ -24,6 +25,7 @@ export default function ExportButtons({
   onFormatChange,
   svg,
 }: {
+  code: string;
   aspect: ExportAspectOption;
   bg: string;
   className?: string;
@@ -35,11 +37,11 @@ export default function ExportButtons({
   onFormatChange: (value: ExportFormat) => void;
   svg: string;
 }) {
-  const hasDiagram = svg.trim().length > 0;
-  const isAspectDisabled = format === "svg" || !hasDiagram;
+  const hasExportableDiagram = code.trim().length > 0 && svg.trim().length > 0;
+  const isAspectDisabled = format === "svg" || !hasExportableDiagram;
 
   const hint = useMemo(() => {
-    if (!hasDiagram) {
+    if (!hasExportableDiagram) {
       return "Render a valid Mermaid diagram to enable export.";
     }
     if (format === "svg") {
@@ -49,25 +51,24 @@ export default function ExportButtons({
       return "Exports at the diagram's original aspect ratio.";
     }
     return `Exports on a ${aspect} canvas and centers the diagram.`;
-  }, [aspect, format, hasDiagram]);
+  }, [aspect, format, hasExportableDiagram]);
 
   const handleExport = () => {
-    if (!hasDiagram) return;
+    if (!hasExportableDiagram) return;
 
     if (format === "svg") {
-      downloadSVG(svg, `${filename}.svg`);
+      downloadSVG(svg, filename);
       return;
     }
 
     const mime = format === "png" ? "image/png" : "image/jpeg";
-    const ext = format === "png" ? "png" : "jpg";
 
     if (aspect === "original") {
-      downloadRasterFromSVG(svg, mime, `${filename}.${ext}`, exportScale, bg);
+      downloadRasterFromSVG(svg, mime, filename, exportScale, bg);
       return;
     }
 
-    downloadRasterForAspect(svg, `${filename}.${ext}`, mime, {
+    downloadRasterForAspect(svg, filename, mime, {
       aspect: ASPECT_MAP[aspect],
       scale: exportScale,
       background: bg,
@@ -106,12 +107,17 @@ export default function ExportButtons({
           id="format"
           value={format}
           onChange={(e) => onFormatChange(e.target.value as ExportFormat)}
-          disabled={!hasDiagram}
+          disabled={!hasExportableDiagram}
           className={[
             "rounded-lg border border-slate-200 px-2 h-8 text-sm bg-white outline-none focus:ring-2 focus:ring-slate-300",
-            !hasDiagram ? "cursor-not-allowed opacity-60" : "",
+            !hasExportableDiagram ? "cursor-not-allowed opacity-60" : "",
           ].join(" ")}
           aria-label="Export format"
+          title={
+            hasExportableDiagram
+              ? "Choose an export format"
+              : "Render a valid Mermaid diagram before choosing an export format"
+          }
         >
           <option value="png">PNG</option>
           <option value="jpg">JPG</option>
@@ -141,11 +147,16 @@ export default function ExportButtons({
         <button
           type="button"
           onClick={handleExport}
-          disabled={!hasDiagram}
-          aria-disabled={!hasDiagram}
+          disabled={!hasExportableDiagram}
+          title={
+            hasExportableDiagram
+              ? "Export diagram"
+              : "Render a valid Mermaid diagram before exporting"
+          }
+          aria-disabled={!hasExportableDiagram}
           className={[
             "ml-1 rounded-lg px-3 h-8 text-sm font-semibold text-white shadow-sm transition",
-            hasDiagram
+            hasExportableDiagram
               ? "bg-slate-900 hover:bg-slate-800 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-slate-300"
               : "cursor-not-allowed bg-slate-400 opacity-70",
           ].join(" ")}

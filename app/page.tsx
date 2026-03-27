@@ -146,6 +146,7 @@ export default function Page() {
 
             <div className="ml-auto self-center">
               <ExportButtons
+                code={code}
                 aspect={exportAspect}
                 svg={svg}
                 bg={bg}
