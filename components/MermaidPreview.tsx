@@ -162,10 +162,16 @@ export default function MermaidPreview({
           startOnLoad: false,
           theme: resolvedTheme,
           securityLevel: "strict",
+          suppressErrorRendering: true,
           fontFamily: "Inter, Pretendard, system-ui, sans-serif",
         });
+        mermaid.setParseErrorHandler?.(() => undefined);
 
-        const { svg } = await mermaid.render(`m-${renderId}`, trimmedCode);
+        const { svg } = await mermaid.render(
+          `m-${renderId}`,
+          trimmedCode,
+          svgContainerRef.current ?? undefined,
+        );
         if (!cancelled && renderSeqRef.current === renderId) {
           const exportableSvg = svg.trim();
           setRawSvg(exportableSvg);
