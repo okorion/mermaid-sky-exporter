@@ -1,8 +1,8 @@
 "use client";
 
+import type { MermaidConfig, Mermaid as MermaidRuntime } from "mermaid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Theme } from "@/libs/presets";
-import type { Mermaid as MermaidRuntime, MermaidConfig } from "mermaid";
 
 type Props = {
   code: string;
@@ -19,11 +19,51 @@ const FIT_PADDING_PX = 16;
 const MIN_FIT_SCALE = 0.4;
 const MAX_FIT_SCALE = 1.2;
 
-const ERROR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="88" viewBox="0 0 420 88" role="img" aria-label="Mermaid parse error">
-  <rect width="100%" height="100%" rx="12" fill="#fee2e2" />
-  <text x="18" y="34" font-size="16" font-weight="700" fill="#991b1b">Mermaid Parse Error</text>
-  <text x="18" y="58" font-size="13" fill="#7f1d1d">Check the diagram syntax and try again.</text>
+function buildStatusSvg({
+  fill,
+  height,
+  label,
+  subtitle,
+  subtitleFill,
+  title,
+  titleFill,
+}: {
+  fill: string;
+  height: number;
+  label: string;
+  subtitle?: string;
+  subtitleFill?: string;
+  title: string;
+  titleFill: string;
+}) {
+  const subtitleLine = subtitle
+    ? `<text x="18" y="58" font-size="13" fill="${subtitleFill ?? titleFill}">${subtitle}</text>`
+    : "";
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="${height}" viewBox="0 0 420 ${height}" role="img" aria-label="${label}">
+  <rect width="100%" height="100%" rx="12" fill="${fill}" />
+  <text x="18" y="34" font-size="16" font-weight="700" fill="${titleFill}">${title}</text>
+  ${subtitleLine}
 </svg>`;
+}
+
+const EMPTY_PREVIEW_SVG = buildStatusSvg({
+  fill: "#f8fafc",
+  height: 60,
+  label: "Empty Mermaid diagram",
+  title: "Enter Mermaid code to preview.",
+  titleFill: "#475569",
+});
+
+const ERROR_PREVIEW_SVG = buildStatusSvg({
+  fill: "#fee2e2",
+  height: 88,
+  label: "Mermaid parse error",
+  subtitle: "Check the diagram syntax and try again.",
+  subtitleFill: "#7f1d1d",
+  title: "Mermaid Parse Error",
+  titleFill: "#991b1b",
+});
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -96,6 +136,16 @@ export default function MermaidPreview({
   useEffect(() => {
     let cancelled = false;
     const renderId = ++renderSeqRef.current;
+    const trimmedCode = code.trim();
+
+    onSVG("");
+
+    if (!trimmedCode) {
+      setRawSvg(EMPTY_PREVIEW_SVG);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     (async () => {
       try {
@@ -115,15 +165,15 @@ export default function MermaidPreview({
           fontFamily: "Inter, Pretendard, system-ui, sans-serif",
         });
 
-        const { svg } = await mermaid.render(`m-${renderId}`, code);
+        const { svg } = await mermaid.render(`m-${renderId}`, trimmedCode);
         if (!cancelled && renderSeqRef.current === renderId) {
-          setRawSvg(svg);
-          onSVG(svg);
+          const exportableSvg = svg.trim();
+          setRawSvg(exportableSvg);
+          onSVG(exportableSvg);
         }
       } catch {
         if (!cancelled && renderSeqRef.current === renderId) {
-          setRawSvg(ERROR_SVG);
-          onSVG(ERROR_SVG);
+          setRawSvg(ERROR_PREVIEW_SVG);
         }
       }
     })();

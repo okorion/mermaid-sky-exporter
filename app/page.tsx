@@ -34,7 +34,7 @@ export default function Page() {
 
   const shareState = useMemo(
     () => ({ code, theme, bg, scale, exportScale, editorMode }),
-    [code, theme, bg, scale, exportScale, editorMode]
+    [code, theme, bg, scale, exportScale, editorMode],
   );
 
   return (
@@ -107,6 +107,7 @@ export default function Page() {
             {/* Export Controls (기존 위치 유지, 중앙선 정렬) */}
             <div className="ml-auto self-center">
               <ExportButtons
+                code={code}
                 svg={svg}
                 bg={bg}
                 exportScale={exportScale}
