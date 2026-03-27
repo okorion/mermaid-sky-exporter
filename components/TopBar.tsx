@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { BookOpenText, ExternalLink, Link2 } from "lucide-react";
 import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { buildShareUrl } from "@/libs/share";
 
 type TopBarProps = {
@@ -73,7 +73,7 @@ export default function TopBar({ state }: TopBarProps) {
   const onShare = async () => {
     if (isSharing) return;
 
-    const url = buildShareUrl(state, window.location.origin);
+    const url = buildShareUrl(state, window.location.href);
     if (!url) {
       showStatus({
         tone: "error",
@@ -96,7 +96,8 @@ export default function TopBar({ state }: TopBarProps) {
     } catch {
       showStatus({
         tone: "error",
-        message: "Could not copy automatically. The share link is ready to use.",
+        message:
+          "Could not copy automatically. The share link is ready to use.",
       });
     } finally {
       setIsSharing(false);

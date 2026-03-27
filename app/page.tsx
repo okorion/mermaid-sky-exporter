@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useMemo, useState } from "react";
 import EditorSwitcher from "@/components/EditorSwitcher";
 import ExportButtons from "@/components/ExportButtons";
@@ -6,7 +7,23 @@ import MermaidPreview from "@/components/MermaidPreview";
 import TopBar from "@/components/TopBar";
 import { DEFAULTS, SAMPLE, THEMES, type Theme } from "@/libs/presets";
 import { decodeShareState } from "@/libs/share";
-import type { Mode } from "@/types/types";
+import type { ExportAspectOption, ExportFormat, Mode } from "@/types/types";
+
+type ShareState = {
+  bg?: string;
+  code?: string;
+  editorMode?: Mode;
+  exportAspect?: ExportAspectOption;
+  exportFilename?: string;
+  exportFormat?: ExportFormat;
+  exportScale?: number;
+  scale?: number;
+  theme?: Theme;
+};
+
+const DEFAULT_EXPORT_FORMAT: ExportFormat = "png";
+const DEFAULT_EXPORT_ASPECT: ExportAspectOption = "original";
+const DEFAULT_EXPORT_FILENAME = "diagram";
 
 export default function Page() {
   const [code, setCode] = useState(SAMPLE);
@@ -14,36 +31,64 @@ export default function Page() {
   const [bg, setBg] = useState(DEFAULTS.bg);
   const [scale, setScale] = useState(DEFAULTS.scale);
   const [exportScale, setExportScale] = useState(DEFAULTS.exportScale);
+  const [exportFormat, setExportFormat] = useState<ExportFormat>(
+    DEFAULT_EXPORT_FORMAT,
+  );
+  const [exportAspect, setExportAspect] = useState<ExportAspectOption>(
+    DEFAULT_EXPORT_ASPECT,
+  );
+  const [exportFilename, setExportFilename] = useState(DEFAULT_EXPORT_FILENAME);
   const [editorMode, setEditorMode] = useState<Mode>("codemirror");
   const [svg, setSvg] = useState("");
 
   useEffect(() => {
     const s = new URLSearchParams(location.search).get("s");
-    if (s) {
-      const restored = decodeShareState<any>(s);
-      if (restored) {
-        setCode(restored.code ?? SAMPLE);
-        setTheme(restored.theme ?? DEFAULTS.theme);
-        setBg(restored.bg ?? DEFAULTS.bg);
-        setScale(restored.scale ?? DEFAULTS.scale);
-        setExportScale(restored.exportScale ?? DEFAULTS.exportScale);
-        setEditorMode(restored.editorMode ?? "codemirror");
-      }
-    }
+    if (!s) return;
+
+    const restored = decodeShareState<ShareState>(s);
+    if (!restored) return;
+
+    setCode(restored.code ?? SAMPLE);
+    setTheme(restored.theme ?? DEFAULTS.theme);
+    setBg(restored.bg ?? DEFAULTS.bg);
+    setScale(restored.scale ?? DEFAULTS.scale);
+    setExportScale(restored.exportScale ?? DEFAULTS.exportScale);
+    setExportFormat(restored.exportFormat ?? DEFAULT_EXPORT_FORMAT);
+    setExportAspect(restored.exportAspect ?? DEFAULT_EXPORT_ASPECT);
+    setExportFilename(restored.exportFilename ?? DEFAULT_EXPORT_FILENAME);
+    setEditorMode(restored.editorMode ?? "codemirror");
   }, []);
 
   const shareState = useMemo(
-    () => ({ code, theme, bg, scale, exportScale, editorMode }),
-    [code, theme, bg, scale, exportScale, editorMode]
+    () => ({
+      code,
+      theme,
+      bg,
+      scale,
+      exportScale,
+      exportFormat,
+      exportAspect,
+      exportFilename,
+      editorMode,
+    }),
+    [
+      bg,
+      code,
+      editorMode,
+      exportAspect,
+      exportFilename,
+      exportFormat,
+      exportScale,
+      scale,
+      theme,
+    ],
   );
 
   return (
     <main className="mx-auto max-w-[1400px] p-4">
       <TopBar state={shareState} />
 
-      {/* 레이아웃: 좌측 에디터(고정폭), 우측 프리뷰(가변폭) */}
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(360px,480px)_1fr]">
-        {/* Editor Panel */}
         <aside className="h-fit sticky top-4 self-start rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur p-3 lg:p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-700">Editor</span>
@@ -58,13 +103,9 @@ export default function Page() {
           />
         </aside>
 
-        {/* Preview + Toolbar Panel */}
         <section className="rounded-2xl border border-slate-200/80 bg-white/60 backdrop-blur shadow-sm flex flex-col">
-          {/* Toolbar — 중앙 정렬 + 높이 통일 */}
           <div className="flex flex-wrap items-center gap-2 lg:gap-3 border-b border-slate-200/70 p-3 lg:p-4 h-22">
-            {/* Theme + Background (살짝 위로) */}
             <div className="flex flex-wrap items-center gap-3 self-start mt-1">
-              {/* Theme */}
               <div className="inline-flex items-center gap-2">
                 <label
                   htmlFor="themeSelect"
@@ -86,7 +127,6 @@ export default function Page() {
                 </select>
               </div>
 
-              {/* Background */}
               <div className="inline-flex items-center gap-2">
                 <label
                   htmlFor="bgPicker"
@@ -104,18 +144,22 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Export Controls (기존 위치 유지, 중앙선 정렬) */}
             <div className="ml-auto self-center">
               <ExportButtons
+                aspect={exportAspect}
                 svg={svg}
                 bg={bg}
                 exportScale={exportScale}
+                filename={exportFilename}
+                format={exportFormat}
+                onAspectChange={setExportAspect}
+                onFilenameChange={setExportFilename}
+                onFormatChange={setExportFormat}
                 className="bg-white/80"
               />
             </div>
           </div>
 
-          {/* Preview 영역 */}
           <div className="relative flex-1 p-3 lg:p-4">
             <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
               <div className="p-2">
