@@ -2,18 +2,110 @@
 
 import { BookOpenText, ExternalLink, Link2 } from "lucide-react";
 import Image from "next/image";
-import { encodeShareState } from "@/libs/share";
+import { useEffect, useRef, useState } from "react";
+import { buildShareUrl } from "@/libs/share";
 
 type TopBarProps = {
   state: unknown;
 };
 
+type ShareStatus = {
+  tone: "success" | "error";
+  message: string;
+};
+
+const STATUS_CLEAR_MS = 2500;
+
 export default function TopBar({ state }: TopBarProps) {
-  const onShare = () => {
-    const b64 = encodeShareState(state);
-    const url = `${location.origin}?s=${encodeURIComponent(b64)}`;
-    navigator.clipboard.writeText(url);
-    alert("공유 링크가 복사되었습니다.");
+  const [isSharing, setIsSharing] = useState(false);
+  const [status, setStatus] = useState<ShareStatus | null>(null);
+  const statusTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (statusTimerRef.current !== null) {
+        window.clearTimeout(statusTimerRef.current);
+      }
+    };
+  }, []);
+
+  const showStatus = (nextStatus: ShareStatus) => {
+    setStatus(nextStatus);
+    if (statusTimerRef.current !== null) {
+      window.clearTimeout(statusTimerRef.current);
+    }
+    statusTimerRef.current = window.setTimeout(() => {
+      setStatus(null);
+      statusTimerRef.current = null;
+    }, STATUS_CLEAR_MS);
+  };
+
+  const copyViaClipboardApi = async (value: string) => {
+    if (!navigator.clipboard?.writeText) return false;
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const copyViaTextarea = (value: string) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.readOnly = true;
+    textarea.setAttribute("aria-hidden", "true");
+    textarea.style.position = "fixed";
+    textarea.style.top = "0";
+    textarea.style.left = "-9999px";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    } finally {
+      document.body.removeChild(textarea);
+    }
+    return copied;
+  };
+
+  const onShare = async () => {
+    if (isSharing) return;
+
+    const url = buildShareUrl(state, window.location.href);
+    if (!url) {
+      showStatus({
+        tone: "error",
+        message: "Unable to generate a share link from the current state.",
+      });
+      return;
+    }
+
+    setIsSharing(true);
+    try {
+      const copied = await copyViaClipboardApi(url);
+      if (!copied && !copyViaTextarea(url)) {
+        throw new Error("Unable to copy share link.");
+      }
+
+      showStatus({
+        tone: "success",
+        message: "Share link copied to clipboard.",
+      });
+    } catch {
+      showStatus({
+        tone: "error",
+        message:
+          "Could not copy automatically. The share link is ready to use.",
+      });
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   return (
@@ -27,7 +119,6 @@ export default function TopBar({ state }: TopBarProps) {
         dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-100
       "
     >
-      {/* 좌측: 로고 + 타이틀 */}
       <div className="flex items-center gap-2 font-extrabold tracking-tight text-slate-800 dark:text-slate-100">
         <Image
           src="/favicon.svg"
@@ -40,44 +131,60 @@ export default function TopBar({ state }: TopBarProps) {
         <span className="text-sm sm:text-base">Mermaid Sky Exporter</span>
       </div>
 
-      {/* 우측: 툴바 */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onShare}
-          className="
-            inline-flex items-center gap-1.5
-            rounded-xl px-3 py-2 text-sm font-semibold
-            text-white shadow-sm ring-1 ring-inset ring-slate-900/5
-            bg-indigo-600 hover:bg-indigo-500 active:translate-y-[1px]
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400
-            dark:bg-indigo-500 dark:hover:bg-indigo-400
-            transition
-          "
-        >
-          <Link2 className="size-4" aria-hidden />
-          <span>Share Link</span>
-        </button>
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onShare}
+            disabled={isSharing}
+            aria-busy={isSharing}
+            className="
+              inline-flex items-center gap-1.5
+              rounded-xl px-3 py-2 text-sm font-semibold
+              text-white shadow-sm ring-1 ring-inset ring-slate-900/5
+              bg-indigo-600 hover:bg-indigo-500 active:translate-y-[1px]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400
+              disabled:cursor-not-allowed disabled:opacity-70
+              dark:bg-indigo-500 dark:hover:bg-indigo-400
+              transition
+            "
+          >
+            <Link2 className="size-4" aria-hidden />
+            <span>{isSharing ? "Sharing..." : "Share Link"}</span>
+          </button>
 
-        <a
-          href="https://mermaid.js.org/"
-          target="_blank"
-          rel="noreferrer"
-          className="
-            inline-flex items-center gap-1.5
-            rounded-xl px-3 py-2 text-sm font-semibold
-            border border-slate-200 bg-white/70 text-slate-700
-            hover:bg-slate-50 active:translate-y-[1px]
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300
-            dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100
-            dark:hover:bg-slate-800
-            transition
-          "
+          <a
+            href="https://mermaid.js.org/"
+            target="_blank"
+            rel="noreferrer"
+            className="
+              inline-flex items-center gap-1.5
+              rounded-xl px-3 py-2 text-sm font-semibold
+              border border-slate-200 bg-white/70 text-slate-700
+              hover:bg-slate-50 active:translate-y-[1px]
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300
+              dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-100
+              dark:hover:bg-slate-800
+              transition
+            "
+          >
+            <BookOpenText className="size-4" aria-hidden />
+            <span className="whitespace-nowrap">Mermaid Docs</span>
+            <ExternalLink className="size-3.5 opacity-70" aria-hidden />
+          </a>
+        </div>
+
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={[
+            "min-h-4 text-[11px] leading-tight",
+            status?.tone === "error" ? "text-rose-600" : "text-slate-500",
+          ].join(" ")}
         >
-          <BookOpenText className="size-4" aria-hidden />
-          <span className="whitespace-nowrap">Mermaid Docs</span>
-          <ExternalLink className="size-3.5 opacity-70" aria-hidden />
-        </a>
+          {status?.message ?? " "}
+        </p>
       </div>
     </div>
   );

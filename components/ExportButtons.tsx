@@ -1,32 +1,42 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   downloadRasterForAspect,
   downloadRasterFromSVG,
   downloadSVG,
 } from "@/libs/svgExport";
-import { ASPECT_MAP, type AspectPreset } from "@/types/types";
-
-type ExportFormat = "svg" | "png" | "jpg";
-type AspectOption = "original" | AspectPreset;
+import {
+  ASPECT_MAP,
+  type ExportAspectOption,
+  type ExportFormat,
+} from "@/types/types";
 
 export default function ExportButtons({
   code,
-  svg,
+  aspect,
   bg,
-  exportScale,
   className = "",
+  exportScale,
+  filename,
+  format,
+  onAspectChange,
+  onFilenameChange,
+  onFormatChange,
+  svg,
 }: {
   code: string;
-  svg: string;
+  aspect: ExportAspectOption;
   bg: string;
-  exportScale: number;
   className?: string;
+  exportScale: number;
+  filename: string;
+  format: ExportFormat;
+  onAspectChange: (value: ExportAspectOption) => void;
+  onFilenameChange: (value: string) => void;
+  onFormatChange: (value: ExportFormat) => void;
+  svg: string;
 }) {
-  const [format, setFormat] = useState<ExportFormat>("png");
-  const [aspect, setAspect] = useState<AspectOption>("original");
-  const [filename, setFilename] = useState("diagram");
   const hasExportableDiagram = code.trim().length > 0 && svg.trim().length > 0;
   const isAspectDisabled = format === "svg" || !hasExportableDiagram;
 
@@ -82,7 +92,7 @@ export default function ExportButtons({
         <input
           id="filename"
           value={filename}
-          onChange={(e) => setFilename(e.target.value)}
+          onChange={(e) => onFilenameChange(e.target.value)}
           className="max-w-[160px] truncate rounded-lg border border-slate-200 px-2 h-8 text-sm outline-none focus:ring-2 focus:ring-slate-300"
           placeholder="diagram"
           spellCheck={false}
@@ -96,7 +106,7 @@ export default function ExportButtons({
         <select
           id="format"
           value={format}
-          onChange={(e) => setFormat(e.target.value as ExportFormat)}
+          onChange={(e) => onFormatChange(e.target.value as ExportFormat)}
           disabled={!hasExportableDiagram}
           className={[
             "rounded-lg border border-slate-200 px-2 h-8 text-sm bg-white outline-none focus:ring-2 focus:ring-slate-300",
@@ -120,11 +130,11 @@ export default function ExportButtons({
         <select
           id="aspect"
           value={isAspectDisabled ? "original" : aspect}
-          onChange={(e) => setAspect(e.target.value as AspectOption)}
+          onChange={(e) => onAspectChange(e.target.value as ExportAspectOption)}
           disabled={isAspectDisabled}
           className={[
             "rounded-lg border border-slate-200 px-2 h-8 text-sm bg-white outline-none focus:ring-2 focus:ring-slate-300",
-            isAspectDisabled ? "opacity-60 cursor-not-allowed" : "",
+            isAspectDisabled ? "cursor-not-allowed opacity-60" : "",
           ].join(" ")}
           aria-label="Aspect ratio preset"
         >
