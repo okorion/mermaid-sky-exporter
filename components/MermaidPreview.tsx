@@ -14,6 +14,35 @@ type Props = {
 const FIXED_PREVIEW_HEIGHT_PX = 500;
 const EPS = 0.005;
 
+function buildStatusSvg({
+  fill,
+  message,
+  textFill,
+}: {
+  fill: string;
+  message: string;
+  textFill: string;
+}) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="60" viewBox="0 0 420 60" role="img" aria-label="${message}">
+    <rect width="420" height="60" rx="12" fill="${fill}"/>
+    <text x="16" y="36" font-size="14" font-family="Inter, Pretendard, system-ui, sans-serif" fill="${textFill}">
+      ${message}
+    </text>
+  </svg>`;
+}
+
+const EMPTY_PREVIEW_SVG = buildStatusSvg({
+  fill: "#f8fafc",
+  message: "Enter Mermaid code to preview.",
+  textFill: "#475569",
+});
+
+const ERROR_PREVIEW_SVG = buildStatusSvg({
+  fill: "#fee2e2",
+  message: "Mermaid Parse Error",
+  textFill: "#b91c1c",
+});
+
 // 노드/엣지 카운트
 function countNodes(code: string): number {
   const m = code.match(/(\[.*?\]|\{.*?\}|\(\(.*?\)\))/g);
@@ -55,7 +84,16 @@ export default function MermaidPreview({
   // 1) Mermaid 렌더
   useEffect(() => {
     let cancelled = false;
+    onSVG("");
     (async () => {
+      const trimmedCode = code.trim();
+      if (!trimmedCode) {
+        if (!cancelled) {
+          setRawSvg(EMPTY_PREVIEW_SVG);
+        }
+        return;
+      }
+
       if (!mermaidRef.current) {
         const mod = await import("mermaid");
         mermaidRef.current = mod.default ?? mod;
@@ -69,19 +107,15 @@ export default function MermaidPreview({
       });
 
       try {
-        const { svg } = await mermaid.render(`m-${Date.now()}`, code);
+        const { svg } = await mermaid.render(`m-${Date.now()}`, trimmedCode);
         if (!cancelled) {
-          setRawSvg(svg);
-          onSVG(svg);
+          const exportableSvg = svg.trim();
+          setRawSvg(exportableSvg);
+          onSVG(exportableSvg);
         }
       } catch {
         if (!cancelled) {
-          const err = `<svg xmlns="http://www.w3.org/2000/svg" width="420" height="60">
-            <rect width="100%" height="100%" fill="#fee2e2"/>
-            <text x="12" y="36" font-size="14" fill="#b91c1c">Mermaid Parse Error</text>
-          </svg>`;
-          setRawSvg(err);
-          onSVG(err);
+          setRawSvg(ERROR_PREVIEW_SVG);
         }
       }
     })();
@@ -136,7 +170,7 @@ export default function MermaidPreview({
     const SAFE_MARGIN = 1;
     const base = Math.min(
       (usableW - SAFE_MARGIN) / svgW,
-      (usableH - SAFE_MARGIN) / svgH
+      (usableH - SAFE_MARGIN) / svgH,
     );
 
     const MIN_FIT_SCALE = 0.5;
@@ -150,7 +184,7 @@ export default function MermaidPreview({
 
     const clamped = Math.min(
       MAX_FIT_SCALE,
-      Math.max(MIN_FIT_SCALE, Number(s.toFixed(3)))
+      Math.max(MIN_FIT_SCALE, Number(s.toFixed(3))),
     );
 
     if (Math.abs(clamped - fitScaleRef.current) > EPS) {
@@ -179,7 +213,7 @@ export default function MermaidPreview({
 
   const appliedScale = useMemo(
     () => (autoFit ? fitScale : scale),
-    [autoFit, fitScale, scale]
+    [autoFit, fitScale, scale],
   );
 
   const handleFitToView = () => {
