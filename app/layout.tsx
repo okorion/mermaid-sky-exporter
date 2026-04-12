@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import "../styles/globals.css";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 
 export const metadata: Metadata = {
   title: "Mermaid Sky Exporter",
@@ -19,8 +17,6 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>{children}</body>
-      <Analytics />
-      <SpeedInsights />
     </html>
   );
 }
