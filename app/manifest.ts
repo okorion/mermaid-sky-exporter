@@ -40,17 +40,16 @@ const MANIFEST_ICONS: NonNullable<MetadataRoute.Manifest["icons"]> = [
   },
 ];
 
-const MANIFEST_SCREENSHOTS: NonNullable<
-  MetadataRoute.Manifest["screenshots"]
-> = [
-  {
-    src: "/homepage.png",
-    sizes: "2874x1508",
-    type: "image/png",
-    form_factor: "wide",
-    label: `${SITE_NAME} homepage`,
-  },
-];
+const MANIFEST_SCREENSHOTS: NonNullable<MetadataRoute.Manifest["screenshots"]> =
+  [
+    {
+      src: "/homepage.png",
+      sizes: "2874x1508",
+      type: "image/png",
+      form_factor: "wide",
+      label: `${SITE_NAME} homepage`,
+    },
+  ];
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
