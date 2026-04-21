@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import type { Mode } from "@/types/types";
 
 const Monaco = dynamic(() => import("@monaco-editor/react"), { ssr: false });
@@ -12,9 +12,9 @@ const CodeMirror = dynamic(
 
 type Props = {
   code: string;
-  onChange(value: string): void;
+  onChange: Dispatch<SetStateAction<string>>;
   mode: Mode;
-  onModeChange(mode: Mode): void;
+  onModeChange: Dispatch<SetStateAction<Mode>>;
 };
 
 export default function EditorSwitcher({

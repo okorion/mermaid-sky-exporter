@@ -61,9 +61,8 @@ self.addEventListener("activate", (event) => {
 });
 
 async function handleNavigation(request, url) {
-  const cache = await caches.open(APP_SHELL_CACHE);
-
   try {
+    const cache = await caches.open(APP_SHELL_CACHE);
     const response = await fetchSameOrigin(url);
     if (isCacheableResponse(response)) {
       await cache.put(APP_SHELL_URL, response.clone());
@@ -71,6 +70,7 @@ async function handleNavigation(request, url) {
     return response;
   } catch {
     try {
+      const cache = await caches.open(APP_SHELL_CACHE);
       return (
         (await cache.match(request, { ignoreSearch: true })) ||
         (await cache.match(APP_SHELL_URL)) ||
