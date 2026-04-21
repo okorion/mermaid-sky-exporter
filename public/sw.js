@@ -60,26 +60,30 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function handleNavigation(request, url) {
-  try {
-    const cache = await caches.open(APP_SHELL_CACHE);
-    const response = await fetchSameOrigin(url);
-    if (isCacheableResponse(response)) {
-      await cache.put(APP_SHELL_URL, response.clone());
-    }
-    return response;
-  } catch {
-    try {
-      const cache = await caches.open(APP_SHELL_CACHE);
-      return (
-        (await cache.match(request, { ignoreSearch: true })) ||
-        (await cache.match(APP_SHELL_URL)) ||
-        Response.error()
-      );
-    } catch {
-      return Response.error();
-    }
-  }
+function handleNavigation(request, url) {
+  return caches
+    .open(APP_SHELL_CACHE)
+    .then((cache) =>
+      fetchSameOrigin(url)
+        .then((response) => {
+          if (!isCacheableResponse(response)) {
+            return response;
+          }
+
+          return cache
+            .put(APP_SHELL_URL, response.clone())
+            .then(() => response);
+        })
+        .catch(() =>
+          cache
+            .match(request, { ignoreSearch: true })
+            .then(
+              (cachedRequest) => cachedRequest || cache.match(APP_SHELL_URL),
+            )
+            .then((fallback) => fallback || Response.error()),
+        ),
+    )
+    .catch(() => Response.error());
 }
 
 async function handleStaticAsset(request, url) {
