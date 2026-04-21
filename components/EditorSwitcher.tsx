@@ -12,9 +12,9 @@ const CodeMirror = dynamic(
 
 type Props = {
   code: string;
-  onChange: (_value: string) => void;
+  onChange(value: string): void;
   mode: Mode;
-  onModeChange: (_mode: Mode) => void;
+  onModeChange(mode: Mode): void;
 };
 
 export default function EditorSwitcher({

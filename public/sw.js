@@ -70,11 +70,15 @@ async function handleNavigation(request, url) {
     }
     return response;
   } catch {
-    return (
-      (await cache.match(request, { ignoreSearch: true })) ||
-      (await cache.match(APP_SHELL_URL)) ||
-      Response.error()
-    );
+    try {
+      return (
+        (await cache.match(request, { ignoreSearch: true })) ||
+        (await cache.match(APP_SHELL_URL)) ||
+        Response.error()
+      );
+    } catch {
+      return Response.error();
+    }
   }
 }
 
