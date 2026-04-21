@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import PwaEnhancements from "@/components/PwaEnhancements";
 import {
   SITE_AUTHOR,
   SITE_DESCRIPTION,
@@ -15,6 +16,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   themeColor: SITE_THEME_COLOR,
   colorScheme: "only light",
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -114,7 +116,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        <PwaEnhancements />
+        {children}
+      </body>
     </html>
   );
 }

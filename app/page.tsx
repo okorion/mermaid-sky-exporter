@@ -42,10 +42,10 @@ export default function Page() {
   const [svg, setSvg] = useState("");
 
   useEffect(() => {
-    const s = new URLSearchParams(location.search).get("s");
-    if (!s) return;
+    const shareState = new URLSearchParams(location.search).get("s");
+    if (!shareState) return;
 
-    const restored = decodeShareState<ShareState>(s);
+    const restored = decodeShareState<ShareState>(shareState);
     if (!restored) return;
 
     setCode(restored.code ?? SAMPLE);
@@ -59,7 +59,7 @@ export default function Page() {
     setEditorMode(restored.editorMode ?? "codemirror");
   }, []);
 
-  const shareState = useMemo(
+  const stateForSharing = useMemo(
     () => ({
       code,
       theme,
@@ -85,11 +85,14 @@ export default function Page() {
   );
 
   return (
-    <main className="mx-auto max-w-[1400px] p-4">
-      <TopBar state={shareState} />
+    <main className="app-shell mx-auto max-w-[1400px]">
+      <TopBar state={stateForSharing} />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(360px,480px)_1fr]">
-        <aside className="h-fit sticky top-4 self-start rounded-2xl border border-slate-200/80 bg-white/70 backdrop-blur p-3 lg:p-4 shadow-sm">
+        <aside
+          className="h-fit self-start rounded-2xl border border-slate-200/80 bg-white/70 p-3 shadow-sm backdrop-blur lg:sticky lg:p-4"
+          style={{ top: "calc(var(--safe-top) + 1rem)" }}
+        >
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-slate-700">Editor</span>
             <div className="text-[11px] text-slate-500">Mode: {editorMode}</div>
@@ -103,13 +106,13 @@ export default function Page() {
           />
         </aside>
 
-        <section className="rounded-2xl border border-slate-200/80 bg-white/60 backdrop-blur shadow-sm flex flex-col">
-          <div className="flex flex-wrap items-center gap-2 lg:gap-3 border-b border-slate-200/70 p-3 lg:p-4 h-22">
-            <div className="flex flex-wrap items-center gap-3 self-start mt-1">
+        <section className="flex flex-col rounded-2xl border border-slate-200/80 bg-white/60 shadow-sm backdrop-blur">
+          <div className="flex flex-col gap-3 border-b border-slate-200/70 p-3 lg:flex-row lg:items-start lg:justify-between lg:p-4">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="inline-flex items-center gap-2">
                 <label
                   htmlFor="themeSelect"
-                  className="text-xs font-medium text-slate-700 leading-none"
+                  className="text-xs font-medium leading-none text-slate-700"
                 >
                   Theme
                 </label>
@@ -117,11 +120,11 @@ export default function Page() {
                   id="themeSelect"
                   value={theme}
                   onChange={(e) => setTheme(e.target.value as Theme)}
-                  className="h-8 rounded-xl border border-slate-200 px-2 text-sm outline-none focus:ring-2 focus:ring-slate-300 bg-white"
+                  className="h-8 rounded-xl border border-slate-200 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-slate-300"
                 >
-                  {THEMES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {THEMES.map((itemTheme) => (
+                    <option key={itemTheme} value={itemTheme}>
+                      {itemTheme}
                     </option>
                   ))}
                 </select>
@@ -130,7 +133,7 @@ export default function Page() {
               <div className="inline-flex items-center gap-2">
                 <label
                   htmlFor="bgPicker"
-                  className="text-xs font-medium text-slate-700 leading-none"
+                  className="text-xs font-medium leading-none text-slate-700"
                 >
                   Background
                 </label>
@@ -144,7 +147,7 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="ml-auto self-center">
+            <div className="min-w-0 lg:ml-auto lg:max-w-full">
               <ExportButtons
                 code={code}
                 aspect={exportAspect}

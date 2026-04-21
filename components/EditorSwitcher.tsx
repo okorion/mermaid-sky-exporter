@@ -1,19 +1,20 @@
 "use client";
+
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { Mode } from "@/types/types";
 
 const Monaco = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 const CodeMirror = dynamic(
-  () => import("@uiw/react-codemirror").then((m) => m.default),
-  { ssr: false }
+  () => import("@uiw/react-codemirror").then((module) => module.default),
+  { ssr: false },
 );
 
 type Props = {
   code: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
   mode: Mode;
-  onModeChange: (m: Mode) => void;
+  onModeChange: (mode: Mode) => void;
 };
 
 export default function EditorSwitcher({
@@ -47,7 +48,7 @@ export default function EditorSwitcher({
           <option value="codemirror">CodeMirror</option>
         </select>
         <small>
-          Mermaid 문법 하이라이트는 에디터 플러그인 추가로 확장 가능
+          Mermaid syntax highlighting depends on the active editor extension.
         </small>
       </div>
 
@@ -56,7 +57,7 @@ export default function EditorSwitcher({
           height={height}
           defaultLanguage="markdown"
           value={code}
-          onChange={(v) => onChange(v ?? "")}
+          onChange={(value) => onChange(value ?? "")}
           options={{
             minimap: { enabled: false },
             fontSize: 14,
