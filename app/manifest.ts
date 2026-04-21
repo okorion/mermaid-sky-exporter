@@ -45,7 +45,7 @@ const MANIFEST_SCREENSHOTS: NonNullable<
 > = [
   {
     src: "/homepage.png",
-    sizes: "1440x900",
+    sizes: "2874x1508",
     type: "image/png",
     form_factor: "wide",
     label: `${SITE_NAME} homepage`,
