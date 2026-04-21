@@ -12,9 +12,9 @@ const CodeMirror = dynamic(
 
 type Props = {
   code: string;
-  onChange: (value: string) => void;
+  onChange: (_value: string) => void;
   mode: Mode;
-  onModeChange: (mode: Mode) => void;
+  onModeChange: (_mode: Mode) => void;
 };
 
 export default function EditorSwitcher({
@@ -57,7 +57,9 @@ export default function EditorSwitcher({
           height={height}
           defaultLanguage="markdown"
           value={code}
-          onChange={(value) => onChange(value ?? "")}
+          onChange={(value) => {
+            onChange(value ?? "");
+          }}
           options={{
             minimap: { enabled: false },
             fontSize: 14,

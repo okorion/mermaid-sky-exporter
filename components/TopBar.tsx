@@ -49,7 +49,10 @@ function isIosSafariBrowser() {
   const isModernIpadOs = platform === "MacIntel" && maxTouchPoints > 1;
   const isAppleMobile = /iPad|iPhone|iPod/.test(userAgent) || isModernIpadOs;
   const isSafari =
-    /Safari/.test(userAgent) && !/CriOS|FxiOS|EdgiOS/.test(userAgent);
+    userAgent.includes("Safari") &&
+    !userAgent.includes("CriOS") &&
+    !userAgent.includes("FxiOS") &&
+    !userAgent.includes("EdgiOS");
 
   return isAppleMobile && isSafari;
 }
@@ -111,7 +114,7 @@ export default function TopBar({ state }: TopBarProps) {
     if (typeof mediaQuery.addEventListener === "function") {
       mediaQuery.addEventListener("change", syncStandalone);
     } else {
-      mediaQuery.addListener?.(syncStandalone);
+      mediaQuery.addListener(syncStandalone);
     }
 
     window.addEventListener(
@@ -124,7 +127,7 @@ export default function TopBar({ state }: TopBarProps) {
       if (typeof mediaQuery.removeEventListener === "function") {
         mediaQuery.removeEventListener("change", syncStandalone);
       } else {
-        mediaQuery.removeListener?.(syncStandalone);
+        mediaQuery.removeListener(syncStandalone);
       }
 
       window.removeEventListener(
@@ -292,7 +295,9 @@ export default function TopBar({ state }: TopBarProps) {
           <div className="flex flex-wrap gap-2 sm:justify-end">
             <button
               type="button"
-              onClick={onShare}
+              onClick={() => {
+                void onShare();
+              }}
               disabled={isSharing}
               aria-busy={isSharing}
               className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-slate-900/5 transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-70 sm:flex-none"
@@ -312,7 +317,9 @@ export default function TopBar({ state }: TopBarProps) {
             {showInstallButton ? (
               <button
                 type="button"
-                onClick={onInstall}
+                onClick={() => {
+                  void onInstall();
+                }}
                 disabled={isInstalling}
                 className="inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-70 sm:flex-none"
               >

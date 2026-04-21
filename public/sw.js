@@ -21,6 +21,22 @@ function isCacheableResponse(response) {
   );
 }
 
+function toSafeSameOriginUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.origin !== self.location.origin) {
+      return null;
+    }
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function fetchSameOrigin(url) {
+  return fetch(url.toString());
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -44,11 +60,11 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function handleNavigation(request) {
+async function handleNavigation(request, url) {
   const cache = await caches.open(APP_SHELL_CACHE);
 
   try {
-    const response = await fetch(request);
+    const response = await fetchSameOrigin(url);
     if (isCacheableResponse(response)) {
       await cache.put(APP_SHELL_URL, response.clone());
     }
@@ -62,24 +78,38 @@ async function handleNavigation(request) {
   }
 }
 
-async function handleStaticAsset(request) {
-  const cache = await caches.open(STATIC_CACHE);
+async function handleStaticAsset(request, url) {
+  const [cache, shellCache] = await Promise.all([
+    caches.open(STATIC_CACHE),
+    caches.open(APP_SHELL_CACHE),
+  ]);
   const cached = await cache.match(request);
   if (cached) {
-    void fetchAndStore(request, cache);
+    void fetchAndStore(request, url, cache);
     return cached;
   }
 
-  const response = await fetch(request);
-  if (isCacheableResponse(response)) {
-    await cache.put(request, response.clone());
+  const precached = await shellCache.match(request, { ignoreSearch: true });
+  if (precached) {
+    await cache.put(request, precached.clone());
+    void fetchAndStore(request, url, cache);
+    return precached;
   }
-  return response;
+
+  try {
+    const response = await fetchSameOrigin(url);
+    if (isCacheableResponse(response)) {
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return Response.error();
+  }
 }
 
-async function fetchAndStore(request, cache) {
+async function fetchAndStore(request, url, cache) {
   try {
-    const response = await fetch(request);
+    const response = await fetchSameOrigin(url);
     if (isCacheableResponse(response)) {
       await cache.put(request, response.clone());
     }
@@ -95,15 +125,15 @@ self.addEventListener("fetch", (event) => {
 
   if (request.method !== "GET") return;
 
-  const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
+  const url = toSafeSameOriginUrl(request.url);
+  if (!url) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(handleNavigation(request));
+    event.respondWith(handleNavigation(request, url));
     return;
   }
 
   if (STATIC_ASSET_PATHS.has(url.pathname)) {
-    event.respondWith(handleStaticAsset(request));
+    event.respondWith(handleStaticAsset(request, url));
   }
 });

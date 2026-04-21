@@ -125,9 +125,9 @@ export default function ExportButtons({
             <select
               id="aspect"
               value={isAspectDisabled ? "original" : aspect}
-              onChange={(e) =>
-                onAspectChange(e.target.value as ExportAspectOption)
-              }
+              onChange={(e) => {
+                onAspectChange(e.target.value as ExportAspectOption);
+              }}
               disabled={isAspectDisabled}
               className={[
                 "h-9 min-w-0 rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none focus:ring-2 focus:ring-slate-300",
