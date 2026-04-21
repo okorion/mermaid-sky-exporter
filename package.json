@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
-    "@uiw/react-codemirror": "^4.25.2",
+    "@uiw/react-codemirror": "^4.25.9",
     "canvg": "^4.0.3",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",
