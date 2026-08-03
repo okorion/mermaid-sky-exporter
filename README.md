@@ -46,4 +46,4 @@ npm run dev
 
 ## License
 
-MIT
+현재 별도 오픈소스 라이선스 파일이 지정되지 않았습니다.

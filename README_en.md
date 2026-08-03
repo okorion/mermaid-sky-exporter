@@ -46,4 +46,4 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## License
 
-MIT
+No separate open-source license has been specified for this repository yet.
